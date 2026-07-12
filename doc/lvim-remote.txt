@@ -1,0 +1,183 @@
+*lvim-remote.txt*    Deploy/sync a project to remote machines over ssh
+
+==============================================================================
+CONTENTS                                              *lvim-remote*
+
+  1. Introduction ........................... |lvim-remote-intro|
+  2. Setup .................................. |lvim-remote-setup|
+  3. Project config ......................... |lvim-remote-project-config|
+  4. Command ................................ |lvim-remote-command|
+  5. Review panel ........................... |lvim-remote-panel|
+  6. Upload on save ......................... |lvim-remote-watch|
+  7. Auth & security ........................ |lvim-remote-auth|
+  8. Highlights ............................. |lvim-remote-highlights|
+  9. Health ................................. |lvim-remote-health|
+
+==============================================================================
+1. INTRODUCTION                                       *lvim-remote-intro*
+
+lvim-remote deploys and syncs a project to remote machines over ssh. Targets
+are defined per project in `.lvim/remote.lua`; the current buffer can be
+uploaded, downloaded, or diffed against its remote copy; whole trees sync
+with rsync in both directions — and EVERY sync runs as an itemized dry run
+first, whose pending changes open in a review panel. Nothing destructive
+executes until you apply exactly what you reviewed; `--delete` reaches the
+real run only when the panel showed the deletions.
+
+Requires Neovim >= 0.11 and the `rsync`, `ssh`, `scp` binaries.
+
+==============================================================================
+2. SETUP                                              *lvim-remote-setup*
+>lua
+  require("lvim-remote").setup({
+      rsync = "rsync",               -- executables (PATH names or absolute)
+      scp = "scp",
+      ssh = "ssh",
+      rsync_flags = { "-a", "-z", "-s" }, -- shared by dry AND real runs;
+                                     -- -n/--delete/-i are managed internally
+      config_file = ".lvim/remote.lua",
+      layout = "float",              -- review panel: float|area|bottom
+      title = "Remote",
+      title_pos = "left",            -- left|center|right
+      debounce = 500,                -- upload-on-save debounce per file (ms)
+      hud_chip = true,               -- statusline watch chip (lvim-hud)
+      watch_notify = false,          -- notify successful watched uploads
+      health_reachability = false,   -- health probes each target over ssh
+      icons = {
+          remote = "󰒍",
+          send = "󰕒",
+          receive = "󰇚",
+          delete = "󰆴",
+          target = "󰓾",
+          diff = "",
+          watch = "",
+      },
+      colors = {                     -- palette keys or "#rrggbb"
+          send = "green",
+          receive = "blue",
+          delete = "red",
+      },
+  })
+<
+==============================================================================
+3. PROJECT CONFIG                                     *lvim-remote-project-config*
+
+`.lvim/remote.lua` at the project root (the nearest ancestor directory that
+contains it). Scaffolded by `:LvimRemote init`. PURE DATA — the file is
+loaded in an empty Lua environment (any function call inside fails), and
+only lazily on the first |:LvimRemote| command, never on BufEnter. An edited
+file is re-read on the next command (mtime-checked).
+>lua
+  return {
+      targets = {
+          production = {
+              host = "myserver",     -- ssh alias (preferred) or user@host
+              path = "/var/www/app", -- absolute remote project root
+              excluded = { ".git", "node_modules", ".env" },
+              port = nil,            -- optional; else ssh_config decides
+          },
+      },
+      default = "production",        -- used when no target is chosen
+      upload_on_save = false,        -- arm the save watcher on first load
+  }
+<
+`excluded` entries are rsync `--exclude` patterns; the save watcher applies
+them too (matched as whole path components or leading prefixes).
+
+With several targets and no `default`, an operation opens the target
+chooser; the pick (and any explicit target argument) is sticky for the
+session.
+
+==============================================================================
+4. COMMAND                                            *lvim-remote-command*
+
+                                                      *:LvimRemote*
+:LvimRemote {sub} [{args}]
+
+  init                  scaffold `.lvim/remote.lua` and open it
+  upload [{target}]     upload the current buffer's file (must be saved —
+                        the DISK file is what transfers)
+  download [{target}]   download the remote copy over the local file;
+                        overwriting a MODIFIED buffer asks first
+  diff [{target}]       fetch the remote copy (over ssh, to memory) and
+                        diff the buffer against it in a vertical split —
+                        a read-only `remote://target/path` scratch; closing
+                        it ends the diff session
+  sync-up [{subdir}] [{target}] [{layout}]
+                        dry run ➤ review panel ➤ apply (local ➤ remote)
+  sync-down [{subdir}] [{target}] [{layout}]
+                        dry run ➤ review panel ➤ apply (remote ➤ local)
+  target [{name}]       choose / set the session-sticky target
+  watch [on|off]        toggle upload-on-save (no argument toggles)
+
+A {layout} token (`float` | `area` | `bottom`) is recognised anywhere in a
+sync's arguments and is sticky for the session; a token matching a target
+name selects that target. Subcommands, targets and layouts complete.
+
+==============================================================================
+5. REVIEW PANEL                                       *lvim-remote-panel*
+
+Every sync's dry run opens the review panel — one row per pending change:
+an op badge (send/receive/delete accent), the path in its op colour, and
+the raw rsync itemize cell. The border counter shows shown/total.
+
+  j / k             move between change rows
+  c / d / a         filter: [c]hanged / [d]eleted / [a]ll (live counts)
+  y                 APPLY — run the real rsync exactly as reviewed;
+                    `--delete` is passed only when deletions were shown
+  q / <Esc>         cancel — nothing runs
+  <C-j> / <C-k>     move between sectors (filter bar · list · footer)
+
+An rsync failure (dry or real) opens the raw output in a read-only viewer.
+
+==============================================================================
+6. UPLOAD ON SAVE                                     *lvim-remote-watch*
+
+`:LvimRemote watch on` (or `upload_on_save = true` in the project config —
+honoured when the config first loads on a user command): saved project
+files upload debounced (`debounce` ms per file). A file transfers only when
+it is under the project root, clears the target's `excluded` patterns, and
+a target resolves SILENTLY (the sticky choice, the config default, or a
+single target) — a save never opens a chooser; with several targets and no
+default it warns once per project instead.
+
+While enabled, a watch chip shows in the statusline via the lvim-hud
+overlay (`hud_chip`). An explicit `watch on|off` wins over the project's
+`upload_on_save` flag for the rest of the session.
+
+==============================================================================
+7. AUTH & SECURITY                                    *lvim-remote-auth*
+
+Authentication is ENTIRELY ssh's business: use ssh keys, an ssh agent, and
+`~/.ssh/config` host aliases. lvim-remote has NO password flow — no secret
+is ever stored, prompted for, logged, or placed on a command line, and a
+target that fails auth simply surfaces ssh's own message.
+
+Passwords must never exist in plain text: a secret-looking field
+(`password`, `passwd`, `pass`, `sshpass`, `secret`, `token`) with a string
+value in `.lvim/remote.lua` makes the whole config INVALID — the commands
+refuse it and |lvim-remote-health| reports it as an error.
+
+Process safety: every process runs with list-form argv via |vim.system()|
+(no local shell); rsync gets `-s` (secluded args), and the scp/ssh remote
+path is shell-escaped for the remote side.
+
+==============================================================================
+8. HIGHLIGHTS                                         *lvim-remote-highlights*
+
+Self-themed from the lvim-utils palette; accents from `colors`:
+
+  LvimRemoteSendBadge / ReceiveBadge / DeleteBadge    row op badges
+  LvimRemoteSendName  / ReceiveName  / DeleteName     path cells
+  LvimRemoteDim  LvimRemoteEmpty
+
+==============================================================================
+9. HEALTH                                             *lvim-remote-health*
+
+`:checkhealth lvim-remote` — the Neovim baseline, the rsync/scp/ssh
+binaries, the lvim-ui/lvim-utils chassis, the current project's config
+(parse + validation, including the no-plaintext-secrets rule), the watcher
+state, a plugin-config sanity pass, and (opt-in `health_reachability`)
+each target probed with `ssh -o BatchMode=yes -o ConnectTimeout=3`.
+
+vim:tw=78:ts=8:noet:ft=help:norl:
