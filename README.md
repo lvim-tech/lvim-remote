@@ -86,7 +86,6 @@ session; a token matching a target name selects that target (and makes it sticky
 | Key             | Action                                                    |
 | --------------- | --------------------------------------------------------- |
 | `j` / `k`       | move between change rows                                  |
-| `c` / `d` / `a` | filter: changed / deleted / all (live counts)             |
 | `y`             | apply — run the real rsync exactly as reviewed            |
 | `q` / `<Esc>`   | cancel — nothing runs                                     |
 | `<C-j>` / `<C-k>` | move between sectors (filter bar · list · footer)       |

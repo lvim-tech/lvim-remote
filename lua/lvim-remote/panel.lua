@@ -106,9 +106,9 @@ end
 ---@return table  a `type="bar"` row
 local function filter_bar(rows, refresh)
     local buttons = {
-        { id = "changed", label = "Changed", key = "c" },
-        { id = "deleted", label = "Deleted", key = "d" },
-        { id = "all", label = "All", key = "a" },
+        { id = "changed", label = "Changed" },
+        { id = "deleted", label = "Deleted" },
+        { id = "all", label = "All" },
     }
     local fb = ui_filters.bar({ { id = "ops", active = state.filter, buttons = buttons } }, {
         count = function(_, b)
