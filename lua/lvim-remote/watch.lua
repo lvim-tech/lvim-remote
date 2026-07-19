@@ -60,22 +60,42 @@ local function refresh_chip()
     end
 end
 
---- Whether `rel` is caught by a target's exclusion patterns. The same entries feed rsync's
---- `--exclude`; here they gate the save watcher with the two shapes that cover the template's
---- kind of pattern: an entry matching a whole path COMPONENT (".git", "node_modules" anywhere in
---- the tree) or a leading path PREFIX ("dist/assets").
+--- Whether `rel` is caught by a target's exclusion patterns. This is the SAME list rsync gets as
+--- `--exclude`, so the watch gate must honour the same shapes, or a target that excludes e.g.
+--- `*.log` from the sync would still upload every saved `.log` file:
+---   * plain entries — a whole path COMPONENT (".git", "node_modules" anywhere) or a leading path
+---     PREFIX ("dist/assets");
+---   * wildcard entries (`*` / `?` / `[…]`) — compiled to a regex via glob2regpat. A pattern with
+---     no "/" matches a basename at ANY depth (each component tested); one with a "/" is anchored to
+---     the project root (the rel path tested) — matching rsync's own anchoring rule.
 ---@param rel string
 ---@param excluded string[]?
 ---@return boolean
 function M.excluded(rel, excluded)
     for _, pat in ipairs(excluded or {}) do
         local p = pat:gsub("/+$", "")
-        if rel == p or rel:sub(1, #p + 1) == p .. "/" then
+        if p:find("[%*%?%[]") then
+            local ok, re = pcall(vim.regex, vim.fn.glob2regpat(p))
+            if ok and re then
+                if p:find("/") then
+                    if re:match_str(rel) then
+                        return true
+                    end
+                else
+                    for comp in rel:gmatch("[^/]+") do
+                        if re:match_str(comp) then
+                            return true
+                        end
+                    end
+                end
+            end
+        elseif rel == p or rel:sub(1, #p + 1) == p .. "/" then
             return true
-        end
-        for comp in rel:gmatch("[^/]+") do
-            if comp == p then
-                return true
+        else
+            for comp in rel:gmatch("[^/]+") do
+                if comp == p then
+                    return true
+                end
             end
         end
     end
@@ -157,6 +177,13 @@ local function on_save(path)
         0,
         vim.schedule_wrap(function()
             local timer = state.timers[path]
+            -- Coalescing guard: this expiry was queued (schedule_wrap) before it ran; if a save in
+            -- that gap re-armed the timer (`on_save` did stop()+start()), it is active again — this
+            -- STALE expiry must not steal its pending upload or close the freshly re-armed timer.
+            -- Let the re-armed timer's own expiry do the work.
+            if timer and timer:is_active() then
+                return
+            end
             if timer then
                 timer:stop()
                 timer:close()

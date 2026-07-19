@@ -318,7 +318,12 @@ function M.sync(direction, subdir, explicit, layout)
                             { direction = direction, root = root, subdir = subdir, delete = with_delete },
                             function(rres)
                                 if rres.ok then
-                                    local c = parse.counts(rows)
+                                    -- Report the REAL run's itemized counts (the real rsync carries
+                                    -- --itemize-changes too), not the dry-run rows — the tree can
+                                    -- change between review and apply. Fall back to the dry counts
+                                    -- when the real output itemizes nothing.
+                                    local real = parse.counts(parse.itemized(rres.stdout, direction))
+                                    local c = (real.changed > 0 or real.deleted > 0) and real or parse.counts(rows)
                                     notify(
                                         ("%s %s %s: %d change(s)%s"):format(
                                             config.icons.remote,

@@ -111,9 +111,10 @@ return {
 ```
 
 The project root is the nearest ancestor directory containing `.lvim/remote.lua`. `excluded`
-entries are rsync `--exclude` patterns; the save watcher applies them too (matched as whole path
-components or leading prefixes). An edited file is re-read on the next command (mtime-checked) —
-no reload step.
+entries are rsync `--exclude` patterns; the save watcher applies them too (whole path components,
+leading prefixes, and wildcard globs like `*.log` or `dist/*.map` — a wildcard entry without a `/`
+matches a basename at any depth, one with a `/` is anchored to the project root). An edited file is
+re-read on the next command (mtime-checked) — no reload step.
 
 ## Setup
 

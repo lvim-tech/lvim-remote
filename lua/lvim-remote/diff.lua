@@ -53,12 +53,31 @@ function M.open(target, target_name, rel, buf, cb)
         vim.bo[scratch].modifiable = false
         vim.bo[scratch].filetype = vim.bo[buf].filetype -- same syntax as the local side
 
-        -- The local window that shows `buf` (the command ran from it); diff it against the
-        -- scratch in a fresh vsplit, and undo the local diff mode when the scratch dies.
-        local local_win = api.nvim_get_current_win()
-        if api.nvim_win_get_buf(local_win) ~= buf then
-            vim.cmd.buffer(buf)
+        -- Find a window that STILL shows `buf`. The ssh callback is scheduled arbitrarily later, so
+        -- the window the command ran from may no longer be current (the user could have `<C-w>w`'d
+        -- away while `ssh cat` was in flight). Forcing the local buffer into whatever window is now
+        -- current would clobber it (a panel / float / another file view). Prefer a window showing
+        -- `buf` in the current tabpage; only when NONE shows it do we fall back to the current window
+        -- and load it there.
+        local local_win
+        local cur_tab = api.nvim_get_current_tabpage()
+        for _, w in ipairs(vim.fn.win_findbuf(buf)) do
+            if api.nvim_win_is_valid(w) then
+                if api.nvim_win_get_tabpage(w) == cur_tab then
+                    local_win = w
+                    break
+                end
+                local_win = local_win or w
+            end
         end
+        if not local_win then
+            local_win = api.nvim_get_current_win()
+            api.nvim_win_set_buf(local_win, buf)
+        end
+
+        -- Diff the local side against the scratch in a fresh vsplit, and undo the local diff mode
+        -- when the scratch dies.
+        api.nvim_set_current_win(local_win)
         vim.cmd.diffthis()
         vim.cmd.vsplit()
         local remote_win = api.nvim_get_current_win()

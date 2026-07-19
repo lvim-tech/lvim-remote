@@ -23,9 +23,11 @@ local M = {}
 ---@field default? string          the target used when none is chosen
 ---@field upload_on_save? boolean  enable the save watcher once this project config loads
 
--- Per-root cache: the loaded config, invalidated by the file's mtime (an edited remote.lua is
--- re-read on the next command — no manual reload step).
----@type table<string, { mtime: integer, cfg: LvimRemoteProjectConfig }>
+-- Per-root cache: the loaded config, invalidated by the file's identity (an edited remote.lua is
+-- re-read on the next command — no manual reload step). Keyed on the FULL mtime (sec + nsec) plus
+-- size, not the second alone: two writes within the same second (a scripted edit, a `git checkout`
+-- of a branch with same-second timestamps) still invalidate.
+---@type table<string, { sec: integer, nsec: integer, size: integer, cfg: LvimRemoteProjectConfig }>
 local cache = {}
 
 -- Target keys that smell like a plaintext secret. Their PRESENCE (with a string value) makes the
@@ -120,8 +122,20 @@ function M.validate(cfg)
         if type(t) ~= "table" then
             err("target '%s' must be a table", tostring(name))
         else
+            -- `host` reaches argv in POSITIONAL / option-adjacent slots of ssh / scp / rsync
+            -- (`{ target.host, "cat …" }`, `host:path`), and ssh has no reliable `--`
+            -- end-of-options. A `-`-leading value would be parsed as an OPTION (e.g.
+            -- `-oProxyCommand=…` → local command execution) — so a cloned repo's `.lvim/remote.lua`
+            -- must never be able to smuggle one. Restrict `host` to the documented shape (ssh alias
+            -- or user@host): first char alnum/`_`, then only `[A-Za-z0-9 . @ _ -]`. This rejects a
+            -- leading `-`, whitespace, slashes, and quotes at the validation seam (the correct place).
             if type(t.host) ~= "string" or vim.trim(t.host) == "" then
                 err("target '%s': host must be a non-empty string (ssh alias or user@host)", name)
+            elseif not t.host:match("^[%w_][%w%.@_%-]*$") then
+                err(
+                    "target '%s': host has an invalid character or a leading '-' — must be an ssh alias or user@host ([A-Za-z0-9._@-], not starting with '-')",
+                    name
+                )
             end
             if type(t.path) ~= "string" or not t.path:match("^/") then
                 err("target '%s': path must be an absolute remote path", name)
@@ -174,7 +188,7 @@ function M.load(root)
         return nil, ("no project config (%s)"):format(path)
     end
     local hit = cache[root]
-    if hit and hit.mtime == stat.mtime.sec then
+    if hit and hit.sec == stat.mtime.sec and hit.nsec == stat.mtime.nsec and hit.size == stat.size then
         return hit.cfg
     end
     local chunk, load_err = loadfile(path)
@@ -190,7 +204,7 @@ function M.load(root)
     if not valid then
         return nil, ("invalid %s:\n  - %s"):format(path, table.concat(errs, "\n  - "))
     end
-    cache[root] = { mtime = stat.mtime.sec, cfg = cfg }
+    cache[root] = { sec = stat.mtime.sec, nsec = stat.mtime.nsec, size = stat.size, cfg = cfg }
     return cfg
 end
 

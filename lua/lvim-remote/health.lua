@@ -99,12 +99,15 @@ function M.check()
         health.error("Neovim >= 0.11 is required (vim.system, vim.fs.root)")
     end
 
-    -- the transfer binaries
-    for _, bin in ipairs({ config.rsync, config.scp, config.ssh }) do
+    -- the transfer binaries — print the CONFIG KEY (rsync/scp/ssh), not the basename of the
+    -- configured value (an absolute path like "/opt/tools/rsync3" would otherwise print a
+    -- non-existent "config.rsync3").
+    for _, entry in ipairs({ { "rsync", config.rsync }, { "scp", config.scp }, { "ssh", config.ssh } }) do
+        local key, bin = entry[1], entry[2]
         if vim.fn.executable(bin) == 1 then
             health.ok(bin .. " found")
         else
-            health.error(bin .. " not executable — set config." .. bin:match("[^/]+$") .. " or install it")
+            health.error(bin .. " not executable — set config." .. key .. " or install it")
         end
     end
 
