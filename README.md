@@ -1,12 +1,12 @@
 # lvim-remote
 
 Deploy and sync a project to remote machines over ssh — the deployment plugin of the lvim-tech
-set. Targets live in a per-project `.lvim/remote.lua`; the current buffer can be uploaded,
+set. Targets live in a per-project `.lvim/remote/config.lua`; the current buffer can be uploaded,
 downloaded, or diffed against its remote copy; whole trees sync with rsync in **both
 directions**, and **every sync runs as a dry run first**: the itemized changes open in a review
 panel, and nothing destructive executes until you apply exactly what you reviewed.
 
-- **Per-project config** — `.lvim/remote.lua` at the project root (pure data: it is loaded in an
+- **Per-project config** — `.lvim/remote/config.lua` at the project root (pure data: it is loaded in an
   empty Lua environment, so nothing in it can execute code — and only lazily, on the first
   `:LvimRemote` command, never on `BufEnter`). `:LvimRemote init` scaffolds it.
 - **File ops** (current buffer) — `upload` (the saved disk file), `download` (asks before
@@ -27,7 +27,7 @@ panel, and nothing destructive executes until you apply exactly what you reviewe
 - **Auth is ssh's business — no passwords, ever.** lvim-remote has **no password flow**: use ssh
   keys / an ssh agent / `~/.ssh/config` aliases. No secret is stored, prompted for, logged, or
   put on a command line — and a plaintext-secret-looking field (`password`, `sshpass`, `token`,
-  …) in `.lvim/remote.lua` makes the whole config **invalid** (`:checkhealth lvim-remote` reports
+  …) in `.lvim/remote/config.lua` makes the whole config **invalid** (`:checkhealth lvim-remote` reports
   it as an error).
 
 ## Requirements
@@ -66,7 +66,7 @@ require("lvim-remote").setup({})
 ## Usage
 
 ```vim
-:LvimRemote init                 " scaffold .lvim/remote.lua at the project root and open it
+:LvimRemote init                 " scaffold .lvim/remote/config.lua at the project root and open it
 :LvimRemote upload [target]      " upload the current buffer's file (must be saved)
 :LvimRemote download [target]    " download the remote copy (confirms over a modified buffer)
 :LvimRemote diff [target]        " diff the buffer against its remote copy (remote://… scratch)
@@ -90,7 +90,7 @@ session; a token matching a target name selects that target (and makes it sticky
 | `q` / `<Esc>`   | cancel — nothing runs                                     |
 | `<C-j>` / `<C-k>` | move between sectors (filter bar · list · footer)       |
 
-## Project config — `.lvim/remote.lua`
+## Project config — `.lvim/remote/config.lua`
 
 ```lua
 -- PURE DATA, no code (loaded in an empty environment, so function calls fail).
@@ -110,7 +110,7 @@ return {
 }
 ```
 
-The project root is the nearest ancestor directory containing `.lvim/remote.lua`. `excluded`
+The project root is the nearest ancestor directory containing `.lvim/remote/config.lua`. `excluded`
 entries are rsync `--exclude` patterns; the save watcher applies them too (whole path components,
 leading prefixes, and wildcard globs like `*.log` or `dist/*.map` — a wildcard entry without a `/`
 matches a basename at any depth, one with a `/` is anchored to the project root). An edited file is
@@ -130,7 +130,7 @@ require("lvim-remote").setup({
     -- `--delete` are managed internally and must not be listed here.
     rsync_flags = { "-a", "-z", "-s" },
     -- The per-project config path, relative to the project root.
-    config_file = ".lvim/remote.lua",
+    config_file = ".lvim/remote/config.lua",
     -- Review panel: layout (a float|area|bottom token on the command overrides it,
     -- sticky for the session), title and title alignment.
     layout = "float",

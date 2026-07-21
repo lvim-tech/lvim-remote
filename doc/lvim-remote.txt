@@ -17,7 +17,7 @@ CONTENTS                                              *lvim-remote*
 1. INTRODUCTION                                       *lvim-remote-intro*
 
 lvim-remote deploys and syncs a project to remote machines over ssh. Targets
-are defined per project in `.lvim/remote.lua`; the current buffer can be
+are defined per project in `.lvim/remote/config.lua`; the current buffer can be
 uploaded, downloaded, or diffed against its remote copy; whole trees sync
 with rsync in both directions — and EVERY sync runs as an itemized dry run
 first, whose pending changes open in a review panel. Nothing destructive
@@ -35,7 +35,7 @@ Requires Neovim >= 0.11 and the `rsync`, `ssh`, `scp` binaries.
       ssh = "ssh",
       rsync_flags = { "-a", "-z", "-s" }, -- shared by dry AND real runs;
                                      -- -n/--delete/-i are managed internally
-      config_file = ".lvim/remote.lua",
+      config_file = ".lvim/remote/config.lua",
       layout = "float",              -- review panel: float|area|bottom
       title = "Remote",
       title_pos = "left",            -- left|center|right
@@ -62,7 +62,7 @@ Requires Neovim >= 0.11 and the `rsync`, `ssh`, `scp` binaries.
 ==============================================================================
 3. PROJECT CONFIG                                     *lvim-remote-project-config*
 
-`.lvim/remote.lua` at the project root (the nearest ancestor directory that
+`.lvim/remote/config.lua` at the project root (the nearest ancestor directory that
 contains it). Scaffolded by `:LvimRemote init`. PURE DATA — the file is
 loaded in an empty Lua environment (any function call inside fails), and
 only lazily on the first |:LvimRemote| command, never on BufEnter. An edited
@@ -96,7 +96,7 @@ session.
                                                       *:LvimRemote*
 :LvimRemote {sub} [{args}]
 
-  init                  scaffold `.lvim/remote.lua` and open it
+  init                  scaffold `.lvim/remote/config.lua` and open it
   upload [{target}]     upload the current buffer's file (must be saved —
                         the DISK file is what transfers)
   download [{target}]   download the remote copy over the local file;
@@ -157,7 +157,7 @@ target that fails auth simply surfaces ssh's own message.
 
 Passwords must never exist in plain text: a secret-looking field
 (`password`, `passwd`, `pass`, `sshpass`, `secret`, `token`) with a string
-value in `.lvim/remote.lua` makes the whole config INVALID — the commands
+value in `.lvim/remote/config.lua` makes the whole config INVALID — the commands
 refuse it and |lvim-remote-health| reports it as an error.
 
 Process safety: every process runs with list-form argv via |vim.system()|

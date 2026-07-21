@@ -1,5 +1,5 @@
 -- lvim-remote: deploy/sync a project to remote machines over ssh — the deployment plugin of the
--- lvim-tech set. Per-project targets in `.lvim/remote.lua` (pure data, loaded lazily on the
+-- lvim-tech set. Per-project targets in `.lvim/remote/config.lua` (pure data, loaded lazily on the
 -- first command — never on BufEnter), single-file upload/download/diff for the current buffer,
 -- and whole-tree rsync in BOTH directions where EVERY sync runs as a dry run first and shows the
 -- itemized changes in a review panel — nothing destructive ever executes unreviewed, and

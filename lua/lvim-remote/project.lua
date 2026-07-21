@@ -1,4 +1,4 @@
--- lvim-remote.project: the per-project deployment config — root finding, `.lvim/remote.lua`
+-- lvim-remote.project: the per-project deployment config — root finding, `.lvim/remote/config.lua`
 -- load / validate / scaffold. The file is user-authored PROJECT DATA (the same trust level as an
 -- exrc), but it is still handled conservatively: loaded lazily on the first command (never
 -- implicitly on BufEnter), executed in an EMPTY environment (a pure data table — any function
@@ -125,7 +125,7 @@ function M.validate(cfg)
             -- `host` reaches argv in POSITIONAL / option-adjacent slots of ssh / scp / rsync
             -- (`{ target.host, "cat …" }`, `host:path`), and ssh has no reliable `--`
             -- end-of-options. A `-`-leading value would be parsed as an OPTION (e.g.
-            -- `-oProxyCommand=…` → local command execution) — so a cloned repo's `.lvim/remote.lua`
+            -- `-oProxyCommand=…` → local command execution) — so a cloned repo's `.lvim/remote/config.lua`
             -- must never be able to smuggle one. Restrict `host` to the documented shape (ssh alias
             -- or user@host): first char alnum/`_`, then only `[A-Za-z0-9 . @ _ -]`. This rejects a
             -- leading `-`, whitespace, slashes, and quotes at the validation seam (the correct place).

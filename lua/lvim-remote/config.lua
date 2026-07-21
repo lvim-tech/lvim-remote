@@ -44,7 +44,7 @@ return {
     rsync_flags = { "-a", "-z", "-s" },
     -- The per-project deployment config, relative to the project root. Pure data (loaded in an
     -- empty environment — no function calls run), never executed implicitly on BufEnter.
-    config_file = ".lvim/remote.lua",
+    config_file = ".lvim/remote/config.lua",
     -- Where the dry-run review panel opens. Resolved per-command (a float|area|bottom token
     -- anywhere in the args, sticky for the session) → this default.
     layout = "float",

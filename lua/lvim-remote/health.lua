@@ -1,7 +1,7 @@
 -- lvim-remote: :checkhealth lvim-remote.
 -- Diagnoses what makes a deploy misbehave invisibly: the transfer binaries (rsync/scp/ssh), the
 -- lvim-ui / lvim-utils chassis the review panel is built on, the CURRENT project's
--- `.lvim/remote.lua` (found? parses? validates? — including the hard no-plaintext-secrets rule,
+-- `.lvim/remote/config.lua` (found? parses? validates? — including the hard no-plaintext-secrets rule,
 -- reported as an ERROR), the watcher state, a config sanity pass, and (opt-in) each target's
 -- ssh reachability. Read-only reporting — never mutates config or state, never touches a secret.
 --
@@ -45,7 +45,7 @@ local function check_config(health)
     end
 end
 
---- Report the current project's `.lvim/remote.lua`: existence, parse, validation (the
+--- Report the current project's `.lvim/remote/config.lua`: existence, parse, validation (the
 --- plaintext-secret scan is part of validate() and surfaces here as an error).
 ---@param health table
 local function check_project(health)
